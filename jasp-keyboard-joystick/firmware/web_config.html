@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jasp Joystick Config</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #181b22;
+    --fg: #e7e9ee;
+    --muted: #8a909c;
+    --accent: #6cf;
+    --accent-2: #fc6;
+    --border: #262a33;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .container { max-width: 720px; margin: 0 auto; }
+  .topbar { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+  .topbar .status { color: var(--muted); font-size: 13px; }
+  .topbar .status.ok { color: #6c6; }
+  .topbar .status.err { color: #f66; }
+  button {
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font: inherit;
+  }
+  button:hover { background: #20242e; }
+  button.primary { background: var(--accent); color: #06121a; border-color: var(--accent); font-weight: 600; }
+  button.danger { color: #f66; border-color: #4a2222; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
+  .row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+  .row label { flex: 0 0 130px; color: var(--muted); }
+  .row .val { flex: 0 0 50px; text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .modes { display: flex; gap: 8px; }
+  .modes label {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .modes input { display: none; }
+  .modes input:checked + span { color: var(--bg); }
+  .modes label:has(input:checked) {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 0 auto;
+  }
+  .telemetry {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--muted);
+  }
+  .telemetry b { display: block; color: var(--fg); font-weight: 600; }
+  .log {
+    font: 12px/1.4 ui-monospace, Menlo, monospace;
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 140px;
+    overflow-y: auto;
+    color: var(--muted);
+  }
+  .log .out { color: var(--accent); }
+  .log .in  { color: #cf6; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 20px; text-align: center; }
+  .footer code { background: var(--panel); padding: 2px 6px; border-radius: 4px; color: var(--fg); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Jasp Keyboard Joystick — Config</h1>
+  <div class="topbar">
+    <button id="btnConnect" class="primary">Connect</button>
+    <div class="status" id="status">Disconnected</div>
+  </div>
+
+  <div id="ui" class="hidden">
+    <div class="panel">
+      <h2>Mode</h2>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="0"><span>🕹 Joystick</span></label>
+        <label><input type="radio" name="mode" value="1"><span>🖱 Mouse</span></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Position</h2>
+      <canvas id="canvas" width="320" height="320"></canvas>
+      <div class="telemetry">
+        <div><b id="xVal">–</b>X raw</div>
+        <div><b id="yVal">–</b>Y raw</div>
+        <div><b id="bVal">–</b>Button</div>
+        <div><b id="cVal">–</b>Center</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Calibration</h2>
+      <div class="row">
+        <label>Center</label>
+        <div style="flex:1" id="centerLabel">—</div>
+        <button id="btnCal">Recalibrate</button>
+      </div>
+      <div class="row">
+        <label>Deadzone</label>
+        <input type="range" id="dz" min="0" max="100" step="1">
+        <div class="val" id="dzVal">–</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Mouse Tuning</h2>
+      <div class="row">
+        <label>Speed</label>
+        <input type="range" id="sens" min="1" max="30" step="1">
+        <div class="val" id="sensVal">–</div>
+      </div>
+      <div class="row">
+        <label>Invert X</label>
+        <input type="checkbox" id="invx">
+      </div>
+      <div class="row">
+        <label>Invert Y</label>
+        <input type="checkbox" id="invy">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Console</h2>
+      <div class="log" id="log"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="btnStatus">Refresh</button>
+        <button id="btnReset" class="danger">Factory Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Requires Chrome/Edge with Web Serial. Run via <code>python3 -m http.server</code> — <code>file://</code> URLs cannot use the Serial API.
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let port = null, reader = null, writer = null, readPromise = null;
+let connected = false;
+let buffer = "";
+let xCenter = 512, yCenter = 512;
+
+function setStatus(text, cls) {
+  const el = $("status");
+  el.textContent = text;
+  el.className = "status" + (cls ? " " + cls : "");
+}
+
+function log(msg, cls) {
+  const el = $("log");
+  const div = document.createElement("div");
+  if (cls) div.className = cls;
+  div.textContent = msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function connect() {
+  if (!("serial" in navigator)) {
+    alert("Web Serial not supported. Use Chrome or Edge.");
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    connected = true;
+    writer = port.writable.getWriter();
+    setStatus("Connected", "ok");
+    $("btnConnect").textContent = "Disconnect";
+    $("ui").classList.remove("hidden");
+    readPromise = startReadLoop();
+    // Pull current config + start telemetry stream
+    await send("status");
+    await send("stream 1");
+  } catch (e) {
+    setStatus("Connect failed: " + e.message, "err");
+  }
+}
+
+async function disconnect() {
+  connected = false;
+  try { await send("stream 0"); } catch {}
+  try { writer.releaseLock(); } catch {}
+  try { await reader.cancel(); } catch {}
+  try { await readPromise; } catch {}
+  try { await port.close(); } catch {}
+  port = writer = reader = null;
+  setStatus("Disconnected");
+  $("btnConnect").textContent = "Connect";
+  $("ui").classList.add("hidden");
+}
+
+async function send(cmd) {
+  if (!writer) return;
+  log("> " + cmd, "out");
+  await writer.write(new TextEncoder().encode(cmd + "\n"));
+}
+
+async function startReadLoop() {
+  const decoder = new TextDecoder();
+  reader = port.readable.getReader();
+  try {
+    while (connected) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (line) handleLine(line);
+      }
+    }
+  } catch (e) {
+    if (connected) setStatus("Read error: " + e.message, "err");
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+}
+
+function handleLine(line) {
+  if (line.startsWith("DATA ")) {
+    const parts = line.slice(5).split(",").map(Number);
+    const [x, y, b, mode] = parts;
+    $("xVal").textContent = x;
+    $("yVal").textContent = y;
+    $("bVal").textContent = b ? "●" : "○";
+    drawJoystick(x, y, b);
+    return;
+  }
+  log("< " + line, "in");
+  if (line.startsWith("MODE=")) {
+    const m = line.slice(5);
+    const v = m === "mouse" || m === "1" ? "1" : "0";
+    document.querySelector(`input[name=mode][value="${v}"]`).checked = true;
+  } else if (line.startsWith("CENTER=")) {
+    const c = line.slice(7);
+    $("centerLabel").textContent = c;
+    $("cVal").textContent = c;
+    const [cx, cy] = c.split(",").map(Number);
+    if (Number.isFinite(cx)) xCenter = cx;
+    if (Number.isFinite(cy)) yCenter = cy;
+  } else if (line.startsWith("DEADZONE=")) {
+    const v = line.slice(9);
+    $("dz").value = v;
+    $("dzVal").textContent = v;
+  } else if (line.startsWith("MSPEED=")) {
+    const v = line.slice(7);
+    $("sens").value = v;
+    $("sensVal").textContent = v;
+  } else if (line.startsWith("INVX=")) {
+    $("invx").checked = line.slice(5) === "1";
+  } else if (line.startsWith("INVY=")) {
+    $("invy").checked = line.slice(5) === "1";
+  }
+}
+
+function drawJoystick(x, y, btn) {
+  const c = $("canvas");
+  const ctx = c.getContext("2d");
+  const w = c.width, h = c.height;
+  ctx.fillStyle = "#0a0c11";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "#222831";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+  ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+  ctx.stroke();
+  ctx.strokeStyle = "#262a33";
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, w / 2 - 4, 0, Math.PI * 2);
+  ctx.stroke();
+  // Signed deflection from the calibrated center; invertX/invertY mirror the firmware
+  // so the dot reflects what the host receives. ±512 ADC counts map to ±(canvas radius),
+  // matching the mouse-mode scale, then clamp into the canvas.
+  let nx = x - xCenter;
+  let ny = y - yCenter;
+  if ($("invx").checked) nx = -nx;
+  if ($("invy").checked) ny = -ny;
+  const px = Math.max(0, Math.min(w, w / 2 + (nx / 512) * (w / 2)));
+  const py = Math.max(0, Math.min(h, h / 2 + (ny / 512) * (h / 2)));
+  ctx.fillStyle = btn ? "#fc6" : "#6cf";
+  ctx.beginPath();
+  ctx.arc(px, py, 9, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Hookups
+$("btnConnect").addEventListener("click", () => connected ? disconnect() : connect());
+$("btnCal").addEventListener("click", async () => { await send("cal"); setTimeout(() => send("status"), 250); });
+$("btnStatus").addEventListener("click", () => send("status"));
+$("btnReset").addEventListener("click", async () => {
+  if (!confirm("Reset all settings to defaults?")) return;
+  await send("reset");
+  setTimeout(() => send("status"), 250);
+});
+
+document.querySelectorAll("input[name=mode]").forEach(r => {
+  r.addEventListener("change", e => send("mode " + (e.target.value === "1" ? "m" : "j")));
+});
+
+function bindSlider(id, valId, cmd) {
+  const el = $(id), valEl = $(valId);
+  el.addEventListener("input", () => valEl.textContent = el.value);
+  el.addEventListener("change", () => send(`${cmd} ${el.value}`));
+}
+bindSlider("dz", "dzVal", "dz");
+bindSlider("sens", "sensVal", "sens");
+
+$("invx").addEventListener("change", e => send("invx " + (e.target.checked ? "1" : "0")));
+$("invy").addEventListener("change", e => send("invy " + (e.target.checked ? "1" : "0")));
+
+drawJoystick(512, 512, false);
+</script>
+</body>
+</html>
