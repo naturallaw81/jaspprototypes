@@ -62,6 +62,7 @@ Always available as a fallback. Set the bottom-right baud rate to **115200**, th
 | `help` | Print the command list |
 | `status` | Print all current settings |
 | `cal` | Sample the resting position and store as new center |
+| `setgate <x0,y0,…,x7,y7>` | Write the 8-direction polar gate (16 int16 offsets from center) — produced by the GUI's "Calibrate Gate" flow; maps the physical extent in every direction to the unit circle |
 | `mode j` / `mode m` | Switch to **j**oystick or **m**ouse mode |
 | `dz <0–200>` | Deadzone in ADC counts (default 15) |
 | `sens <1–30>` | Mouse-mode cursor speed (default 10) |
