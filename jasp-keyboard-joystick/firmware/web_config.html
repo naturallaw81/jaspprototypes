@@ -54,6 +54,15 @@
   .row .val { flex: 0 0 50px; text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
   input[type=range] { flex: 1; accent-color: var(--accent); }
   input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  select {
+    flex: 1;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font: inherit;
+  }
   .modes { display: flex; gap: 8px; }
   .modes label {
     flex: 1;
@@ -120,6 +129,10 @@
       <div class="modes">
         <label><input type="radio" name="mode" value="0"><span>🕹 Joystick</span></label>
         <label><input type="radio" name="mode" value="1"><span>🖱 Mouse</span></label>
+        <label><input type="radio" name="mode" value="2"><span>📜 Scroll</span></label>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color: var(--muted);" id="gestureHint">
+        🖱 1/2/3× = L/R/M click · holds = L/R drag · 2×+hold = scroll  ·  📜 hold = back to mouse
       </div>
     </div>
 
@@ -167,6 +180,55 @@
       <div class="row">
         <label>Invert Y</label>
         <input type="checkbox" id="invy">
+      </div>
+      <div class="row">
+        <label>Button Style</label>
+        <select id="mbtn">
+          <option value="0">Mouse only — taps: L/R/M · holds: drag L/R/M (no switch)</option>
+          <option value="1">3-tap switch — taps: L/R · 3× = scroll · holds: drag L/R/M</option>
+          <option value="2">3rd-tap-hold switch — taps: L/R/M · holds: drag L/R · 2×+hold = scroll</option>
+          <option value="3">Hold switch (browsing) — taps: L/R/M · hold = scroll · tap+hold = drag L/R</option>
+          <option value="4">Fast tap (gaming) — instant left click/drag only, no gestures</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Scroll Tuning</h2>
+      <div class="row">
+        <label>Speed</label>
+        <input type="range" id="ssens" min="1" max="30" step="1">
+        <div class="val" id="ssensVal">–</div>
+      </div>
+      <div class="row">
+        <label>Invert Scroll</label>
+        <input type="checkbox" id="sinv">
+        <div style="flex:1; font-size:12px; color: var(--muted);">natural scrolling — flips both axes</div>
+      </div>
+      <div class="row">
+        <label>Axis Lock</label>
+        <input type="checkbox" id="slock">
+        <div style="flex:1; font-size:12px; color: var(--muted);">only the dominant axis scrolls (off = both at once)</div>
+      </div>
+      <div class="row">
+        <label>Tap Window</label>
+        <input type="range" id="tap" min="150" max="600" step="10">
+        <div class="val" id="tapVal">–</div>
+      </div>
+      <div class="row">
+        <label>Auto Return</label>
+        <input type="range" id="sidle" min="0" max="120" step="5">
+        <div class="val" id="sidleVal">–</div>
+      </div>
+      <div style="margin:-4px 0 8px 142px; font-size:12px; color: var(--muted);">
+        seconds of inactivity before returning to mouse mode · 0 = off
+      </div>
+      <div class="row">
+        <label>Button Style</label>
+        <select id="sbtn">
+          <option value="0">Hold = back to mouse (taps ignored)</option>
+          <option value="1">Tap = back to mouse (instant)</option>
+        </select>
       </div>
     </div>
 
@@ -302,6 +364,9 @@ function handleLine(line) {
     $("xVal").textContent = x;
     $("yVal").textContent = y;
     $("bVal").textContent = b ? "●" : "○";
+    // Tap gestures can change the mode on-device — keep the radio in sync
+    const mEl = document.querySelector(`input[name=mode][value="${mode}"]`);
+    if (mEl && !mEl.checked) mEl.checked = true;
     if (calMode) updateCalSample(x, y);
     drawJoystick(x, y, b);
     return;
@@ -321,7 +386,8 @@ function handleLine(line) {
   log("< " + line, "in");
   if (line.startsWith("MODE=")) {
     const m = line.slice(5);
-    const v = m === "mouse" || m === "1" ? "1" : "0";
+    const v = m === "scroll" || m === "2" ? "2"
+            : m === "mouse"  || m === "1" ? "1" : "0";
     document.querySelector(`input[name=mode][value="${v}"]`).checked = true;
   } else if (line.startsWith("CENTER=")) {
     const c = line.slice(7);
@@ -342,6 +408,28 @@ function handleLine(line) {
     $("invx").checked = line.slice(5) === "1";
   } else if (line.startsWith("INVY=")) {
     $("invy").checked = line.slice(5) === "1";
+  } else if (line.startsWith("SSPEED=")) {
+    const v = line.slice(7);
+    $("ssens").value = v;
+    $("ssensVal").textContent = v;
+  } else if (line.startsWith("SINV=")) {
+    $("sinv").checked = line.slice(5) === "1";
+  } else if (line.startsWith("SLOCK=")) {
+    $("slock").checked = line.slice(6) === "1";
+  } else if (line.startsWith("TAP=")) {
+    const v = line.slice(4);
+    $("tap").value = v;
+    $("tapVal").textContent = v;
+  } else if (line.startsWith("SIDLE=")) {
+    const v = line.slice(6);
+    $("sidle").value = v;
+    $("sidleVal").textContent = v;
+  } else if (line.startsWith("SBTN=")) {
+    $("sbtn").value = line.slice(5);
+    updateGestureHint();
+  } else if (line.startsWith("MBTN=")) {
+    $("mbtn").value = line.slice(5);
+    updateGestureHint();
   } else if (line.startsWith("DEBUG=")) {
     $("debug").checked = line.slice(6) === "1";
   } else if (line.startsWith("GATE=")) {
@@ -498,7 +586,10 @@ $("btnReset").addEventListener("click", async () => {
 });
 
 document.querySelectorAll("input[name=mode]").forEach(r => {
-  r.addEventListener("change", e => send("mode " + (e.target.value === "1" ? "m" : "j")));
+  r.addEventListener("change", e => {
+    const letter = { "0": "j", "1": "m", "2": "s" }[e.target.value] || "j";
+    send("mode " + letter);
+  });
 });
 
 function bindSlider(id, valId, cmd) {
@@ -508,9 +599,38 @@ function bindSlider(id, valId, cmd) {
 }
 bindSlider("dz", "dzVal", "dz");
 bindSlider("sens", "sensVal", "sens");
+bindSlider("ssens", "ssensVal", "ssens");
+bindSlider("tap", "tapVal", "tap");
+bindSlider("sidle", "sidleVal", "sidle");
 
 $("invx").addEventListener("change", e => send("invx " + (e.target.checked ? "1" : "0")));
 $("invy").addEventListener("change", e => send("invy " + (e.target.checked ? "1" : "0")));
+$("sinv").addEventListener("change", e => send("sinv " + (e.target.checked ? "1" : "0")));
+$("slock").addEventListener("change", e => send("slock " + (e.target.checked ? "1" : "0")));
+
+function updateGestureHint() {
+  const m = {
+    "0": "1/2/3× = L/R/M click · (N-1)tap+hold = L/R/M drag",
+    "1": "1/2× = L/R click · 3× = scroll · tap-holds = L/R/M drag",
+    "2": "1/2/3× = L/R/M click · holds = L/R drag · 2×+hold = scroll",
+    "3": "1/2/3× = L/R/M click · hold = scroll · tap+hold = L/R drag",
+    "4": "instant left click & drag — no gestures, switch via this UI",
+  }[$("mbtn").value] || "";
+  const s = {
+    "0": "hold = back to mouse",
+    "1": "tap = back to mouse",
+  }[$("sbtn").value] || "";
+  $("gestureHint").textContent =
+    "🖱 " + m + "  ·  📜 " + s + "  (no events fire before a gesture resolves)";
+}
+$("sbtn").addEventListener("change", e => {
+  send("sbtn " + e.target.value);
+  updateGestureHint();
+});
+$("mbtn").addEventListener("change", e => {
+  send("mbtn " + e.target.value);
+  updateGestureHint();
+});
 $("debug").addEventListener("change", e => send("debug " + (e.target.checked ? "1" : "0")));
 
 drawJoystick(512, 512, false);

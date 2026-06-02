@@ -1,0 +1,6 @@
+# Local Arduino IDE installation — not part of the project
+arduino_ide/
+
+# Local tooling / debug artifacts
+.claude/
+tap_capture.log

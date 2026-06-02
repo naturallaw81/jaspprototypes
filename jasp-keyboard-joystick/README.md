@@ -16,6 +16,10 @@ There is no detailed build guide available at the moment, but you can see the wh
 ## Firmware
 There is a quick and dirty firmware available [here](https://github.com/multifex/prototypes/blob/main/jasp-keyboard-joystick/firmware), it's super basic but it works. If I make something more advanced, I'll be sure to update it. [Installation guide](https://github.com/multifex/prototypes/blob/main/jasp-keyboard-joystick/firmware/Firmware_Installation_Guide.md)
 
+> **Local fork note** — this copy ships an enhanced firmware set (see [firmware/Firmware_Installation_Guide.md](firmware/Firmware_Installation_Guide.md)):
+> - [`firmware/sketch_promicro`](firmware/sketch_promicro/sketch_promicro.ino) — main firmware: joystick / mouse / scroll modes, deferred tap-hold button gestures, polar-gate calibration, mode-blink LED, EEPROM-persisted settings, configured live via [`firmware/web_config.html`](firmware/web_config.html) (Web Serial)
+> - [`firmware/sketch_promicro_xinput`](firmware/sketch_promicro_xinput/sketch_promicro_xinput.ino) — game build: enumerates as a native Xbox 360 controller (XInput); reuses the main firmware's stored calibration
+
 
 ## License
 
